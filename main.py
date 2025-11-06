@@ -2,9 +2,10 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import google.generativeai as genai
 import os
-from google.generativeai import types # Import types for configuration
+from google.generativeai import types
+from typing import List, Dict, Any
 
-# --- 1. INITIALIZE FASTAPI APP HERE ---
+# --- 1. INITIALIZE FASTAPI APP ---
 app = FastAPI()
 
 app.add_middleware(
@@ -15,6 +16,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# You must have GEMINI_API_KEY set in your Render environment variables
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 # --- 2. DEFINE SYSTEM INSTRUCTION ---
@@ -30,7 +32,21 @@ SYSTEM_INSTRUCTION = (
 )
 
 
-# --- 3. DEFINE THE CHAT ENDPOINT AFTER 'app' IS DEFINED ---
+# --- NEW FUNCTION TO FIX DATA FORMATTING ---
+def _prepare_chat_history(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Converts the simple Godot message format to the strict Gemini Content format."""
+    prepared_history = []
+    for msg in messages:
+        # Check if 'content' exists and is not empty before conversion
+        if 'content' in msg and msg['content']:
+            prepared_history.append({
+                "role": msg.get("role", "user"), # Default role to 'user' if missing
+                "parts": [{"text": msg["content"]}] # Wrap content in the required 'parts' structure
+            })
+    return prepared_history
+
+
+# --- 3. DEFINE THE CHAT ENDPOINT ---
 @app.post("/chat")
 async def chat(request: Request):
     data = await request.json()
@@ -41,16 +57,26 @@ async def chat(request: Request):
     if not messages_history:
         return {"reply": "Sorry, I didn't receive your message. Please try again."}
 
+    # CRITICAL FIX: Convert the history array to the strict format
+    prepared_messages = _prepare_chat_history(messages_history)
+
     # Initialize model with System Instruction
     model = genai.GenerativeModel(
         model_name="gemini-2.5-flash",
         system_instruction=SYSTEM_INSTRUCTION
     )
     
-    # Pass the entire conversation history to the 'contents' parameter
-    response = model.generate_content(
-        contents=messages_history
-    )
+    # Pass the prepared history to the 'contents' parameter
+    # Note: If the crash persists, it might indicate an issue with your API key or Render deployment environment itself.
+    try:
+        response = model.generate_content(
+            contents=prepared_messages
+        )
+    except Exception as e:
+        # This catches the ServerError (500) if it happens during the call
+        print(f"Gemini API Call Failed: {e}")
+        # Return a custom error to Godot (to trigger "Can't talk right now")
+        return {"reply": "API_ERROR"} # Use a custom key/value that Godot can interpret as a failure
 
     if not response.text:
         return {"reply": "Sorry, I missed that. Can you say it again?"}
