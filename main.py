@@ -21,10 +21,15 @@ async def chat(request: Request):
     user_message = data.get("message", "")
 
     model = genai.GenerativeModel("gemini-2.5-flash")
-    response = model.generate_content(
-        f"You are a boyfriend NPC in 2D game. "
-        f"Speak like a character in that world. Be sweet, smart, witty, funny, emotional."
+    prompt = (
+        f"You are a loving boyfriend NPC in a 2D game. "
+        f"Reply naturally and sweetly to the player. "
+        f"Do NOT include actions, thoughts, or parentheses. "
+        f"Do NOT use markdown, quotes, or special symbols. "
+        f"Keep your reply short and conversational. "
         f"Player says: {user_message}"
     )
+
+    response = model.generate_content(prompt)
 
     return {"reply": response.text}
