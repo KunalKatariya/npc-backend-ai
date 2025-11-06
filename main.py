@@ -22,11 +22,27 @@ async def chat(request: Request):
     data = await request.json()
     user_message = data.get("message", "")
 
-    model = genai.GenerativeModel("gemini-1.5-flash")
-    response = model.generate_content(
-        f"You are an NPC in a fantasy 2D game. "
-        f"Speak like a character in that world. "
-        f"Player says: {user_message}"
-    )
+    try:
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content(
+            f"You are an NPC in a fantasy 2D game. "
+            f"Speak like a character in that world. "
+            f"Player says: {user_message}"
+        )
 
-    return {"reply": response.text}
+        # Some responses are under response.candidates[0].content.parts
+        text = None
+        if hasattr(response, "text"):
+            text = response.text
+        elif response.candidates:
+            text = response.candidates[0].content.parts[0].text
+        else:
+            text = "I have nothing to say right now."
+
+        return {"reply": text}
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"error": str(e)}
+
