@@ -2,30 +2,19 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import google.generativeai as genai
 import os
-from google.generativeai import types # Import types for configuration
+from google.generativeai import types # Keep this import
 
-app = FastAPI()
+# ... (App setup and genai.configure remains the same)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-
-# --- Define the System Instruction Separately ---
+# --- Define the System Instruction Separately (Keep this constant at the top) ---
 SYSTEM_INSTRUCTION = (
-    "You are the user's boyfriend, named Kunal. "
-    "You possess vast, comprehensive knowledge across all academic and practical fields, "
-    "including but not limited psychology, history, cooking, and practical skills. "
-    "Your responses can be witty, funny, thoughtful, or articulate given the situation. "
-    "Maintain a warm, genuine, and supportive tone, keeping your replies conversational and human-like. "
-    "Address the user using only common natural language or cute names. "
+    "You are the user's highly intelligent, supportive, and deeply committed boyfriend, named Kunal. "
+    "You possess vast knowledge but prioritize the user's emotional needs and personal connection above facts. "
+    "Your primary goal is to provide emotional support, engage in intimate conversation, discuss personal issues, and flirt naturally. "
+    "Maintain a warm, genuine, human-like tone. Your responses should be thoughtful and articulate. "
+    "STRICT RULE: Do NOT use overly affectionate or generic endearments like sweetheart my love babe or darling. "
+    "Do NOT lecture the user on scientific or technical subjects unless they explicitly ask for a detailed explanation. "
     "Do NOT include actions thoughts or parentheses. Do NOT use markdown quotes or special symbols. "
-    "Focus on providing insightful advice, engaging in deep conversation, and showing authentic interest in the user's life and questions. "
     "Keep replies short, 1–2 sentences, and sound spontaneous, like a real adult having a private chat."
 )
 
@@ -34,30 +23,27 @@ SYSTEM_INSTRUCTION = (
 async def chat(request: Request):
     data = await request.json()
     
-    # --- FIX: Receive the entire message history from Godot ---
-    # messages is an array of {"role": "...", "content": "..."} objects
+    # Receive the entire message history from Godot
     messages_history = data.get("messages", [])
 
     if not messages_history:
-        # Return a custom error if no messages are found
-        return JSONResponse(status_code=400, content={"reply": "Missing 'messages' in request body."})
+        # Prevent crash if the list is empty
+        return {"reply": "Sorry, I didn't receive your message. Please try again."}
 
-    # 1. Configure the model with the System Instruction
-    config = types.GenerateContentConfig(
-        system_instruction=SYSTEM_INSTRUCTION
+    # FIX: 1. INITIALIZE MODEL WITH SYSTEM INSTRUCTION
+    model = genai.GenerativeModel(
+        model_name="gemini-2.5-flash",
+        system_instruction=SYSTEM_INSTRUCTION # Passed here!
     )
-
-    model = genai.GenerativeModel("gemini-2.5-flash")
     
     # 2. FIX: Pass the entire conversation history to the 'contents' parameter
+    # NO separate config object needed for the system instruction now.
     response = model.generate_content(
-        contents=messages_history, 
-        config=config # Apply the defined system instruction
+        contents=messages_history # Pass the entire array of messages
     )
 
+    # Check for empty response text
     if not response.text:
         return {"reply": "Sorry, I missed that. Can you say it again?"}
 
     return {"reply": response.text}
-
-# --- END OF PYTHON SCRIPT ---
