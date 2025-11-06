@@ -20,7 +20,7 @@ async def chat(request: Request):
     data = await request.json()
     user_message = data.get("message", "")
 
-    model = genai.GenerativeModel("models/gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-2.5-flash")
     response = model.generate_content(
         f"You are a boyfriend NPC in 2D game. "
         f"Speak like a character in that world. Be sweet, smart, witty, funny, emotional."
