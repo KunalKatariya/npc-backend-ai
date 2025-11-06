@@ -2,11 +2,22 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import google.generativeai as genai
 import os
-from google.generativeai import types # Keep this import
+from google.generativeai import types # Import types for configuration
 
-# ... (App setup and genai.configure remains the same)
+# --- 1. INITIALIZE FASTAPI APP HERE ---
+app = FastAPI()
 
-# --- Define the System Instruction Separately (Keep this constant at the top) ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+# --- 2. DEFINE SYSTEM INSTRUCTION ---
 SYSTEM_INSTRUCTION = (
     "You are the user's highly intelligent, supportive, and deeply committed boyfriend, named Kunal. "
     "You possess vast knowledge but prioritize the user's emotional needs and personal connection above facts. "
@@ -19,6 +30,7 @@ SYSTEM_INSTRUCTION = (
 )
 
 
+# --- 3. DEFINE THE CHAT ENDPOINT AFTER 'app' IS DEFINED ---
 @app.post("/chat")
 async def chat(request: Request):
     data = await request.json()
@@ -27,22 +39,19 @@ async def chat(request: Request):
     messages_history = data.get("messages", [])
 
     if not messages_history:
-        # Prevent crash if the list is empty
         return {"reply": "Sorry, I didn't receive your message. Please try again."}
 
-    # FIX: 1. INITIALIZE MODEL WITH SYSTEM INSTRUCTION
+    # Initialize model with System Instruction
     model = genai.GenerativeModel(
         model_name="gemini-2.5-flash",
-        system_instruction=SYSTEM_INSTRUCTION # Passed here!
+        system_instruction=SYSTEM_INSTRUCTION
     )
     
-    # 2. FIX: Pass the entire conversation history to the 'contents' parameter
-    # NO separate config object needed for the system instruction now.
+    # Pass the entire conversation history to the 'contents' parameter
     response = model.generate_content(
-        contents=messages_history # Pass the entire array of messages
+        contents=messages_history
     )
 
-    # Check for empty response text
     if not response.text:
         return {"reply": "Sorry, I missed that. Can you say it again?"}
 
