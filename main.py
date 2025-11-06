@@ -38,6 +38,10 @@ async def chat(request: Request):
     # messages is an array of {"role": "...", "content": "..."} objects
     messages_history = data.get("messages", [])
 
+    if not messages_history:
+        # Return a custom error if no messages are found
+        return JSONResponse(status_code=400, content={"reply": "Missing 'messages' in request body."})
+
     # 1. Configure the model with the System Instruction
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_INSTRUCTION
